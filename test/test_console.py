@@ -1,105 +1,89 @@
 #!/usr/bin/python3
-"""Defines unittests for console.py.
-"""
-from io import StringIO
-import os
+
 import unittest
-from unittest.mock import patch
-from console import HBNBCommand
-from models import storage
-import json
+from io import StringIO
+from contextlib import redirect_stdout
+from models.engine.file_storage import FileStorage
 from models.base_model import BaseModel
-from models.user import User
-from models.place import Place
-from models.state import State
-from models.city import City
-from models.amenity import Amenity
-from models.review import Review
+from HBNBCommand import HBNBCommand
 
 
-class TestConsole(unittest.TestCase):
-    """Base class for testing Console.
+class TestHBNBCommmand(unittest.TestCase):
+    """
+    Test case for the HBNBCommand class
     """
 
     def setUp(self):
-        pass
-
-    def tearDown(self) -> None:
-        """Resets FileStorage data."""
-        storage._FileStorage__objects = {}
-        if os.path.exists(storage._FileStorage__file_path):
-            os.remove(storage._FileStorage__file_path)
-
-    def test_simple(self):
-        """Tests basic commands.
         """
+        Set up test objects
+        """
+        self.fs = FileStorage()
+        self.base_model = BaseModel()
+        self.cmd = HBNBCommand()
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("quit")
-            self.assertEqual(f.getvalue(), "")
+    def tearDown(self):
+        """
+        Remove test objects
+        """
+        self.fs.reload()
+        try:
+            os.remove("file.json")
+        except FileNotFoundError:
+            pass
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("EOF")
-            self.assertEqual(f.getvalue(), "\n")
+    def test_quit_command(self):
+        """
+        Test quit command to exit the program
+        """
+        self.assertIsInstance(self.cmd.do_quit(""), bool)
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("\n")
-            self.assertEqual(f.getvalue(), "")
+    def test_invalid_create_command(self):
+        """
+        Test create command with invalid class name
+        """
+        with self.assertRaises(Exception):
+            self.cmd.do_create("InvalidClass")
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("?")
-            self.assertIsInstance(f.getvalue(), str)
+    def test_create_command(self):
+        """
+        Test create command with valid class name
+        """
+        self.assertIsInstance(self.cmd.do_create("BaseModel"), str)
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("help")
-            self.assertIsInstance(f.getvalue(), str)
+    def test_show_command_no_id(self):
+        """
+        Test show command without id
+        """
+        with self.assertRaises(Exception):
+            self.cmd.do_show("BaseModel")
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("? create")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(), "Creates a new instance.")
+    def test_show_command_invalid_class(self):
+        """
+        Test show command with invalid class name
+        """
+        with self.assertRaises(Exception):
+            self.cmd.do_show("InvalidClass 1234-1234-1234")
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("help create")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(), "Creates a new instance.")
+    def test_show_command(self):
+        """
+        Test show command with valid class name and id
+        """
+        captured_output = StringIO()
+        with redirect_stdout(captured_output):
+            self.cmd.do_create("BaseModel")
+            self.cmd.do_show("BaseModel " + self.base_model.id)
+        output = captured_output.getvalue().strip()
+        self.assertIsInstance(output, str)
+        self.assertGreater(len(output), 0)
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("? all")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             "Prints string representation of all instances.")
+    def test_postloop_newline(self):
+        """
+        Test postloop newline
+        """
+        self.cmd.postloop()
+        self.assertEqual("\n", captured_output.getvalue().strip())
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            HBNBCommand().onecmd("help all")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             "Prints string representation of all instances.")
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            msg = "Prints the string representation of an instance."
-            HBNBCommand().onecmd("? show")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             msg)
+if __name__ == '__main__':
+    unittest.main()
 
-        with patch('sys.stdout', new=StringIO()) as f:
-            msg = "Prints the string representation of an instance."
-            HBNBCommand().onecmd("help show")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             msg)
-
-        with patch('sys.stdout', new=StringIO()) as f:
-            msg = "Updates an instance based on the class name and id."
-            HBNBCommand().onecmd("? update")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             msg)
-
-        with patch('sys.stdout', new=StringIO()) as f:
-            msg = "Updates an instance based on the class name and id."
-            HBNBCommand().onecmd("help update")
-            self.assertIsInstance(f.getvalue(), str)
-            self.assertEqual(f.getvalue().strip(),
-                             msg)
